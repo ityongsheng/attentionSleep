@@ -1,0 +1,55 @@
+# Training Configuration
+training:
+  batch_size: 32
+  epochs: 100
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  optimizer: "AdamW"
+  scheduler: "CosineAnnealingLR"
+  num_workers: 4
+  device: "cuda"  # or "cpu"
+
+# Model Configuration
+model:
+  backbone: "mobilenet_v3_large"
+  pretrained: true
+  num_classes: 3  # normal, drowsy, very_drowsy
+  use_eca: true
+  use_cbam: true
+  use_lstm: true
+  lstm_hidden_size: 128
+  lstm_num_layers: 2
+  sequence_length: 30  # frames
+
+# Data Configuration
+data:
+  dataset_path: "data/processed"
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  image_size: [224, 224]
+  augmentation: true
+
+# Augmentation Configuration
+augmentation:
+  random_brightness: 0.2
+  random_contrast: 0.2
+  random_rotation: 15
+  random_flip: 0.5
+  gaussian_noise: 0.01
+  random_occlusion: 0.3
+
+# Fatigue Detection Thresholds
+thresholds:
+  ear_threshold: 0.25  # Eye Aspect Ratio
+  mar_threshold: 0.6   # Mouth Aspect Ratio
+  ear_consecutive_frames: 15  # frames
+  mar_consecutive_frames: 20  # frames
+  head_pose_threshold: 30  # degrees
+
+# Logging
+logging:
+  log_dir: "logs"
+  tensorboard: true
+  save_interval: 5  # epochs
+  checkpoint_dir: "models/checkpoints"

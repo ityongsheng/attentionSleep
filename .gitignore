@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# PyTorch
+*.pth
+*.pt
+*.onnx
+*.engine
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+data/raw/
+data/processed/
+logs/
+database/*.db
+models/checkpoints/*.pth
+models/checkpoints/*.onnx
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# Screenshots
+logs/screenshots/*.jpg
+logs/screenshots/*.png
+
+# TensorBoard
+runs/
+
+# Documentation builds
+docs/_build/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Environment variables
+.env
+.env.local

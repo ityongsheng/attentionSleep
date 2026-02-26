@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(textutil -convert txt:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}
