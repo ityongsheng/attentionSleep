@@ -30,8 +30,8 @@ def export_to_onnx(model_path, output_path, input_size=(1, 3, 224, 224)):
         use_lstm=False  # Export spatial model only for simplicity
     ).to(device)
 
-    checkpoint = torch.load(model_path, map_location=device)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+    model.load_state_dict(checkpoint['model_state_dict'], strict=False)
     model.eval()
 
     # Create dummy input

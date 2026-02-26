@@ -4,15 +4,21 @@ Real-time fatigue detector using trained model
 import torch
 import cv2
 import numpy as np
-import mediapipe as mp
 from collections import deque
 import sys
 from pathlib import Path
+
+import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision as mp_vision
 
 sys.path.append(str(Path(__file__).parent.parent))
 
 from models.hybrid_model import HybridFatigueDetector
 from data.preprocess import calculate_ear, calculate_mar
+
+# Path to the FaceLandmarker task model file
+_FACE_LANDMARKER_MODEL = str(Path(__file__).parent.parent / 'models' / 'face_landmarker.task')
 
 
 class FatigueDetector:
@@ -25,14 +31,18 @@ class FatigueDetector:
         # Load model
         self.model = self._load_model(model_path)
 
-        # Initialize MediaPipe Face Mesh
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
+        # Initialize MediaPipe FaceLandmarker (new Tasks API)
+        base_options = mp_python.BaseOptions(model_asset_path=_FACE_LANDMARKER_MODEL)
+        face_landmarker_options = mp_vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
             min_tracking_confidence=0.5
         )
+        self.face_landmarker = mp_vision.FaceLandmarker.create_from_options(face_landmarker_options)
 
         # Temporal buffers for LSTM
         self.sequence_length = config['model']['sequence_length']
@@ -65,9 +75,11 @@ class FatigueDetector:
 
         checkpoint = torch.load(model_path, map_location=self.device)
         model.load_state_dict(checkpoint['model_state_dict'])
+        model.float()  # Ensure model weights are float32 to match input tensors
         model.eval()
 
         return model
+
 
     def _preprocess_image(self, image):
         """Preprocess image for model input"""
@@ -78,25 +90,27 @@ class FatigueDetector:
         img = img.astype(np.float32) / 255.0
         img = (img - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
 
-        # Convert to tensor
-        img = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)
+        # Convert to tensor and match model's dtype (handles float32/float64 mismatch)
+        model_dtype = next(self.model.parameters()).dtype
+        img = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).to(dtype=model_dtype)
 
         return img.to(self.device)
 
     def _extract_landmarks(self, image):
-        """Extract facial landmarks using MediaPipe"""
+        """Extract facial landmarks using MediaPipe FaceLandmarker (new Tasks API)"""
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        results = self.face_mesh.process(image_rgb)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+        results = self.face_landmarker.detect(mp_image)
 
-        if not results.multi_face_landmarks:
+        if not results.face_landmarks:
             return None
 
-        landmarks = results.multi_face_landmarks[0]
+        landmarks = results.face_landmarks[0]
 
         # Convert to numpy array
         h, w = image.shape[:2]
         points = []
-        for landmark in landmarks.landmark:
+        for landmark in landmarks:
             x = int(landmark.x * w)
             y = int(landmark.y * h)
             points.append([x, y])
@@ -208,4 +222,4 @@ class FatigueDetector:
 
     def release(self):
         """Release resources"""
-        self.face_mesh.close()
+        self.face_landmarker.close()

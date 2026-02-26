@@ -17,8 +17,10 @@ import numpy as np
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from deployment.detector import FatigueDetector
+import requests
 from alerts.voice_engine import VoiceAlertEngine
+
+API_URL = "http://127.0.0.1:8000/api/v1"
 from database.db_manager import DatabaseManager
 
 
@@ -27,9 +29,8 @@ class VideoThread(QThread):
     change_pixmap_signal = pyqtSignal(np.ndarray)
     detection_result_signal = pyqtSignal(dict)
 
-    def __init__(self, detector, camera_id=0):
+    def __init__(self, camera_id=0):
         super().__init__()
-        self.detector = detector
         self.camera_id = camera_id
         self.running = False
 
@@ -38,21 +39,53 @@ class VideoThread(QThread):
         cap = cv2.VideoCapture(self.camera_id)
         self.running = True
 
+        # Reset session on start
+        try:
+            requests.post(f"{API_URL}/reset", timeout=2.0)
+        except Exception:
+            pass # API might not be reachable yet
+
         while self.running:
             ret, frame = cap.read()
             if ret:
-                # Detect fatigue
-                result = self.detector.detect(frame)
+                # Detect fatigue via API
+                try:
+                    _, buffer = cv2.imencode('.jpg', frame)
+                    response = requests.post(f"{API_URL}/detect", files={"file": ("frame.jpg", buffer.tobytes(), "image/jpeg")}, timeout=1.0)
+                    if response.status_code == 200:
+                        result = response.json()
+                        # Convert landmarks back to numpy array
+                        if 'landmarks' in result and result['landmarks'] is not None:
+                            result['landmarks'] = np.array(result['landmarks'])
+                    else:
+                        result = self._get_error_result("API Error")
+                except Exception as e:
+                    # API Offline
+                    result = self._get_error_result("API Offline")
 
                 # Draw landmarks and info on frame
                 if result['status'] == 'success':
                     frame = self._draw_info(frame, result)
+                elif result['status'] == 'error':
+                    # Draw error message
+                    cv2.putText(frame, result['class'], (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
                 # Emit signals
                 self.change_pixmap_signal.emit(frame)
                 self.detection_result_signal.emit(result)
 
         cap.release()
+
+    def _get_error_result(self, msg):
+        return {
+            'status': 'error',
+            'class': msg,
+            'confidence': 0.0,
+            'ear': 0.0,
+            'mar': 0.0,
+            'alert': False,
+            'landmarks': None
+        }
 
     def _draw_info(self, frame, result):
         """Draw detection info on frame"""
@@ -104,7 +137,6 @@ class MainWindow(QMainWindow):
             self.config = yaml.safe_load(f)
 
         # Initialize components
-        self.detector = None
         self.voice_engine = VoiceAlertEngine()
         self.db_manager = DatabaseManager()
         self.session_id = None
@@ -249,21 +281,22 @@ class MainWindow(QMainWindow):
     def start_monitoring(self):
         """Start fatigue monitoring"""
         try:
-            # Initialize detector if not already done
-            if self.detector is None:
-                model_path = 'models/checkpoints/best_model.pth'
-                if not Path(model_path).exists():
-                    self.log_message("Error: Model file not found. Please train the model first.")
+            # Check if API server is running
+            try:
+                response = requests.post(f"{API_URL}/reset", timeout=2.0)
+                if response.status_code != 200:
+                    self.log_message("Error: API Server returned error.")
                     return
-
-                self.detector = FatigueDetector(model_path, self.config)
-                self.log_message("Detector initialized successfully")
+                self.log_message("Connected to API Server successfully")
+            except Exception as e:
+                self.log_message("Error: API Server is offline. Please start it using 'python api/server.py'.")
+                return
 
             # Start database session
             self.session_id = self.db_manager.start_session()
 
             # Start video thread
-            self.video_thread = VideoThread(self.detector)
+            self.video_thread = VideoThread(self.camera_id if hasattr(self, 'camera_id') else 0)
             self.video_thread.change_pixmap_signal.connect(self.update_image)
             self.video_thread.detection_result_signal.connect(self.handle_detection)
             self.video_thread.start()
@@ -366,9 +399,6 @@ class MainWindow(QMainWindow):
         """Handle window close event"""
         if self.is_monitoring:
             self.stop_monitoring()
-
-        if self.detector:
-            self.detector.release()
 
         event.accept()
 

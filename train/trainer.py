@@ -30,11 +30,12 @@ class Trainer:
             self.config = yaml.safe_load(f)
 
         # Setup device
-        self.device = torch.device(
-            self.config['training']['device']
-            if torch.cuda.is_available()
-            else 'cpu'
-        )
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        else:
+            self.device = torch.device("cpu")
         print(f"Using device: {self.device}")
 
         # Create model

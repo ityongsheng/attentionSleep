@@ -30,6 +30,7 @@ ENV/
 *.pt
 *.onnx
 *.engine
+*.task
 
 # Jupyter Notebook
 .ipynb_checkpoints

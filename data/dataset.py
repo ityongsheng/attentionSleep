@@ -42,7 +42,7 @@ class FatigueDataset(Dataset):
         for class_dir in self.data_dir.iterdir():
             if class_dir.is_dir():
                 class_name = class_dir.name
-                for img_path in class_dir.glob('*.jpg'):
+                for img_path in list(class_dir.rglob('*.jpg')) + list(class_dir.rglob('*.png')):
                     samples.append({
                         'image_path': str(img_path),
                         'class': class_name

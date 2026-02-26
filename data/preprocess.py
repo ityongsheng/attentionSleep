@@ -24,11 +24,12 @@ class DataAugmentation:
                     p=0.5
                 ),
                 A.Rotate(limit=15, p=0.5),
-                A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+                A.GaussNoise(std_range=(0.012, 0.028), p=0.3),
                 A.CoarseDropout(
-                    max_holes=8,
-                    max_height=20,
-                    max_width=20,
+                    num_holes_range=(1, 8),
+                    hole_height_range=(1, 20),
+                    hole_width_range=(1, 20),
+                    fill=0,
                     p=0.3
                 ),
                 A.Normalize(
@@ -132,5 +133,54 @@ def calculate_mar(mouth_landmarks):
 
 
 if __name__ == "__main__":
-    # Example usage
-    print("Data preprocessing utilities loaded")
+    # Path configuration
+    raw_dir = Path("data/raw")
+    processed_dir = Path("data/processed")
+    
+    # Ensure directories exist
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Define class mapping (assuming folder names in raw_dir match class names)
+    # Expected structure: data/raw/{normal, drowsy, very_drowsy}/*.mp4
+    classes = ['normal', 'drowsy', 'very_drowsy']
+    
+    print("=" * 60)
+    print("Data Preprocessing Tool")
+    print("=" * 60)
+    
+    found_data = False
+    for cls in classes:
+        cls_raw_path = raw_dir / cls
+        cls_proc_path = processed_dir / cls
+        
+        if not cls_raw_path.exists():
+            print(f"Skipping {cls}: Directory {cls_raw_path} not found")
+            continue
+            
+        video_files = list(cls_raw_path.glob("*.mp4")) + list(cls_raw_path.glob("*.avi"))
+        if not video_files:
+            print(f"Skipping {cls}: No video files found in {cls_raw_path}")
+            continue
+            
+        found_data = True
+        print(f"\nProcessing class: {cls}")
+        cls_proc_path.mkdir(parents=True, exist_ok=True)
+        
+        for video in video_files:
+            print(f"  Extracting from: {video.name}")
+            # Save frames to a subdirectory for this video, or directly to class folder
+            # Here we save directly to class folder for simplicity in FatigueDataset loading
+            extract_frames_from_video(
+                str(video), 
+                str(cls_proc_path), 
+                frame_interval=10  # Reduced interval for faster processing
+            )
+            
+    if not found_data:
+        print("\n[WARNING] No data found to process!")
+        print(f"Please place your videos in subdirectories under {raw_dir}:")
+        for cls in classes:
+            print(f"  - {raw_dir}/{cls}/your_video.mp4")
+    else:
+        print("\nPreprocessing completed successfully!")

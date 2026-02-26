@@ -36,3 +36,9 @@ tensorboard>=2.15.0
 # Model Optimization (Optional)
 # tensorrt>=8.6.0  # Requires NVIDIA GPU
 # openvino>=2023.0  # Intel optimization
+
+# API Backend
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+requests>=2.31.0

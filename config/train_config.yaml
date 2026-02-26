@@ -1,13 +1,13 @@
 # Training Configuration
 training:
   batch_size: 32
-  epochs: 100
-  learning_rate: 0.001
+  epochs: 15
+  learning_rate: 0.0001
   weight_decay: 0.0001
   optimizer: "AdamW"
   scheduler: "CosineAnnealingLR"
   num_workers: 4
-  device: "cuda"  # or "cpu"
+  device: "mps"  # Use 'mps' for MacBook M1 acceleration, or 'cpu' if not available
 
 # Model Configuration
 model:
